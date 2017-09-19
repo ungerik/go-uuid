@@ -127,13 +127,6 @@ func unixTimeFunc() uint64 {
 // described in RFC 4122.
 type UUID [16]byte
 
-// NullUUID can be used with the standard sql package to represent a
-// UUID value that can be NULL in the database
-type NullUUID struct {
-	UUID  UUID
-	Valid bool
-}
-
 // The nil UUID is special form of UUID that is specified to have all
 // 128 bits set to zero.
 var Nil = UUID{}
@@ -223,19 +216,23 @@ func (u *UUID) SetVariant() {
 // MarshalText implements the encoding.TextMarshaler interface.
 // The encoding is the same as returned by String.
 func (u UUID) MarshalText() (text []byte, err error) {
-	text = []byte(u.String())
-	return
+	return []byte(u.String()), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 // Following formats are supported:
+// "6ba7b8109dad11d180b400c04fd430c8",
 // "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
 // "{6ba7b810-9dad-11d1-80b4-00c04fd430c8}",
 // "urn:uuid:6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 func (u *UUID) UnmarshalText(text []byte) (err error) {
 	if len(text) < 32 {
-		err = fmt.Errorf("uuid: UUID string too short: %s", text)
-		return
+		return fmt.Errorf("uuid: UUID string too short: %s", text)
+	}
+
+	if len(text) == 32 {
+		_, err = hex.Decode(u[:], text)
+		return err
 	}
 
 	t := text[:]
@@ -253,51 +250,45 @@ func (u *UUID) UnmarshalText(text []byte) (err error) {
 	for i, byteGroup := range byteGroups {
 		if i > 0 {
 			if t[0] != '-' {
-				err = fmt.Errorf("uuid: invalid string format")
-				return
+				return fmt.Errorf("uuid: invalid string format")
 			}
 			t = t[1:]
 		}
 
 		if len(t) < byteGroup {
-			err = fmt.Errorf("uuid: UUID string too short: %s", text)
-			return
+			return fmt.Errorf("uuid: UUID string too short: %s", text)
 		}
 
 		if i == 4 && len(t) > byteGroup &&
 			((braced && t[byteGroup] != '}') || len(t[byteGroup:]) > 1 || !braced) {
-			err = fmt.Errorf("uuid: UUID string too long: %s", text)
-			return
+			return fmt.Errorf("uuid: UUID string too long: %s", text)
 		}
 
 		_, err = hex.Decode(b[:byteGroup/2], t[:byteGroup])
 		if err != nil {
-			return
+			return err
 		}
 
 		t = t[byteGroup:]
 		b = b[byteGroup/2:]
 	}
 
-	return
+	return nil
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
 func (u UUID) MarshalBinary() (data []byte, err error) {
-	data = u.Bytes()
-	return
+	return u.Bytes(), nil
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface.
 // It will return error if the slice isn't 16 bytes long.
 func (u *UUID) UnmarshalBinary(data []byte) (err error) {
 	if len(data) != 16 {
-		err = fmt.Errorf("uuid: UUID must be exactly 16 bytes long, got %d bytes", len(data))
-		return
+		return fmt.Errorf("uuid: UUID must be exactly 16 bytes long, got %d bytes", len(data))
 	}
 	copy(u[:], data)
-
-	return
+	return nil
 }
 
 // Value implements the driver.Valuer interface.
@@ -323,32 +314,11 @@ func (u *UUID) Scan(src interface{}) error {
 	return fmt.Errorf("uuid: cannot convert %T to UUID", src)
 }
 
-// Value implements the driver.Valuer interface.
-func (u NullUUID) Value() (driver.Value, error) {
-	if !u.Valid {
-		return nil, nil
-	}
-	// Delegate to UUID Value function
-	return u.UUID.Value()
-}
-
-// Scan implements the sql.Scanner interface.
-func (u *NullUUID) Scan(src interface{}) error {
-	if src == nil {
-		u.UUID, u.Valid = Nil, false
-		return nil
-	}
-
-	// Delegate to UUID Scan function
-	u.Valid = true
-	return u.UUID.Scan(src)
-}
-
 // FromBytes returns UUID converted from raw byte slice input.
 // It will return error if the slice isn't 16 bytes long.
 func FromBytes(input []byte) (u UUID, err error) {
 	err = u.UnmarshalBinary(input)
-	return
+	return u, err
 }
 
 // FromBytesOrNil returns UUID converted from raw byte slice input.
@@ -365,7 +335,7 @@ func FromBytesOrNil(input []byte) UUID {
 // Input is expected in a form accepted by UnmarshalText.
 func FromString(input string) (u UUID, err error) {
 	err = u.UnmarshalText([]byte(input))
-	return
+	return u, err
 }
 
 // FromStringOrNil returns UUID parsed from string input.
@@ -374,6 +344,16 @@ func FromStringOrNil(input string) UUID {
 	uuid, err := FromString(input)
 	if err != nil {
 		return Nil
+	}
+	return uuid
+}
+
+// FromStringOrPanic returns UUID parsed from string input.
+// Panics if there is an error
+func FromStringOrPanic(input string) UUID {
+	uuid, err := FromString(input)
+	if err != nil {
+		panic(err)
 	}
 	return uuid
 }

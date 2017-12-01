@@ -2,6 +2,7 @@ package uuid
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 )
 
@@ -24,6 +25,10 @@ func SetFromSlice(s []UUID) Set {
 	set := make(Set)
 	set.AddSlice(s)
 	return set
+}
+
+func (set Set) String() string {
+	return fmt.Sprintf("set%v", set.SortedSlice())
 }
 
 func (set Set) Slice() []UUID {

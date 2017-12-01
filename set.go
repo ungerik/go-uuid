@@ -31,6 +31,15 @@ func (set Set) String() string {
 	return fmt.Sprintf("set%v", set.SortedSlice())
 }
 
+// GetOne returns a random UUID from the set or Nil if the set is empty.
+// Most useful to get the only UUID in a set of size one.
+func (set Set) GetOne() UUID {
+	for id := range set {
+		return id
+	}
+	return Nil
+}
+
 func (set Set) Slice() []UUID {
 	s := make([]UUID, len(set))
 	i := 0

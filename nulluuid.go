@@ -120,7 +120,7 @@ func (u *NullUUID) UnmarshalJSON(data []byte) (err error) {
 }
 
 // MarshalJSON implements json.Marshaler.
-// It will encode null if this String is null.
+// It will encode null if Valid == false.
 func (u NullUUID) MarshalJSON() ([]byte, error) {
 	if !u.Valid {
 		return []byte("null"), nil
@@ -148,4 +148,13 @@ func (u *NullUUID) UnmarshalText(text []byte) (err error) {
 	u.UUID, err = FromBytes(text)
 	u.Valid = err == nil
 	return err
+}
+
+// String returns the UUID as string if Valid == true,
+// or "null" if Valid == false.
+func (u NullUUID) String() string {
+	if !u.Valid {
+		return "null"
+	}
+	return u.UUID.String()
 }

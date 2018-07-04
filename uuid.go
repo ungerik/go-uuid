@@ -348,9 +348,9 @@ func FromStringOrNil(input string) UUID {
 	return uuid
 }
 
-// FromStringOrPanic returns UUID parsed from string input.
+// MustFromString returns UUID parsed from string input.
 // Panics if there is an error
-func FromStringOrPanic(input string) UUID {
+func MustFromString(input string) UUID {
 	uuid, err := FromString(input)
 	if err != nil {
 		panic(err)

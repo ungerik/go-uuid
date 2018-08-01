@@ -56,6 +56,14 @@ func (set Set) SortedSlice() []UUID {
 	return s
 }
 
+func (set Set) SortedStringSlice() []string {
+	s := make([]string, len(set))
+	for i, id := range set.SortedSlice() {
+		s[i] = id.String()
+	}
+	return s
+}
+
 func (set Set) AddSlice(s []UUID) {
 	for _, id := range s {
 		set[id] = struct{}{}

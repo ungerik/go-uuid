@@ -4,36 +4,16 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 )
-
-func Less(a, b UUID) bool {
-	return bytes.Compare(a[:], b[:]) < 0
-	// for i := len(a) - 1; i >= 0; i-- {
-	// 	if a[i] < b[i] {
-	// 		return true
-	// 	}
-	// 	if a[i] > b[i] {
-	// 		return false
-	// 	}
-	// }
-	// return false
-}
 
 // Set of UUIDs
 // Is a map[UUID]struct{} underneath.
 // Implements the database/sql.Scanner and database/sql/driver.Valuer interfaces
 // with the nil map value used as SQL NULL
 type Set map[UUID]struct{}
-
-func SetFromSlice(s []UUID) Set {
-	set := make(Set)
-	set.AddSlice(s)
-	return set
-}
 
 func (set Set) String() string {
 	return fmt.Sprintf("set%v", set.SortedSlice())
@@ -48,8 +28,8 @@ func (set Set) GetOne() UUID {
 	return Nil
 }
 
-func (set Set) Slice() []UUID {
-	s := make([]UUID, len(set))
+func (set Set) Slice() Slice {
+	s := make(Slice, len(set))
 	i := 0
 	for id := range set {
 		s[i] = id
@@ -58,21 +38,13 @@ func (set Set) Slice() []UUID {
 	return s
 }
 
-func (set Set) SortedSlice() []UUID {
+func (set Set) SortedSlice() Slice {
 	s := set.Slice()
-	sort.Slice(s, func(i, j int) bool { return Less(s[i], s[j]) })
+	s.Sort()
 	return s
 }
 
-func (set Set) SortedStringSlice() []string {
-	s := make([]string, len(set))
-	for i, id := range set.SortedSlice() {
-		s[i] = id.String()
-	}
-	return s
-}
-
-func (set Set) AddSlice(s []UUID) {
+func (set Set) AddSlice(s Slice) {
 	for _, id := range s {
 		set[id] = struct{}{}
 	}
@@ -88,7 +60,7 @@ func (set Set) Add(id UUID) {
 	set[id] = struct{}{}
 }
 
-func (set Set) Has(id UUID) bool {
+func (set Set) Contains(id UUID) bool {
 	_, has := set[id]
 	return has
 }
@@ -103,7 +75,7 @@ func (set Set) DeleteAll() {
 	}
 }
 
-func (set Set) DeleteSlice(s []UUID) {
+func (set Set) DeleteSlice(s Slice) {
 	for _, id := range s {
 		delete(set, id)
 	}
@@ -124,12 +96,12 @@ func (set Set) Clone() Set {
 func (set Set) Diff(other Set) Set {
 	diff := make(Set)
 	for id := range set {
-		if !other.Has(id) {
+		if !other.Contains(id) {
 			diff.Add(id)
 		}
 	}
 	for id := range other {
-		if !set.Has(id) {
+		if !set.Contains(id) {
 			diff.Add(id)
 		}
 	}
@@ -166,7 +138,7 @@ func (set *Set) scanBytes(src []byte) (err error) {
 		return errors.Errorf("Can't parse %#v as uuid.Set", string(src))
 	}
 
-	ids := make([]UUID, 0, 16)
+	ids := make(Slice, 0, 16)
 
 	elements := bytes.Split(src[1:len(src)-1], []byte{','})
 	for _, elem := range elements {
@@ -201,10 +173,11 @@ func (set Set) Value() (driver.Value, error) {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		b.WriteByte('\'')
+		b.WriteByte('"')
 		b.WriteString(id.String())
-		b.WriteByte('\'')
+		b.WriteByte('"')
 	}
 	b.WriteByte('}')
+
 	return b.String(), nil
 }

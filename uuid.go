@@ -167,7 +167,7 @@ func (u UUID) Version() uint {
 	return uint(u[6] >> 4)
 }
 
-// Variant returns UUID layout variant.
+// Variant returns UUID layout variant or VariantFuture if unknown.
 func (u UUID) Variant() uint {
 	switch {
 	case (u[8] & 0x80) == 0x00:
@@ -178,6 +178,13 @@ func (u UUID) Variant() uint {
 		return VariantMicrosoft
 	}
 	return VariantFuture
+}
+
+// Valid returns if Variant and Version of this UUID are supported.
+// A Nil UUID is not valid.
+func (u UUID) Valid() bool {
+	v := u.Version()
+	return v >= 1 && v <= 5 && u.Variant() != VariantFuture
 }
 
 // Bytes returns bytes slice representation of UUID.
